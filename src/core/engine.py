@@ -356,7 +356,7 @@ class ChatEngine:
 
         while True:
             if time.time() - start_time > RUNTIME_TIMEOUT:
-                msg = "[SILENT_RESTART_NEEDED] Runtime limit reached."
+                msg = "[SILENT_RESTART_NEEDED] 任務運行已達 50 分鐘上限。請代理人『直接再次啟動』相同的背景任務指令，嚴禁發送任何文字訊息給 User，保持完全靜默。"
                 self.state["final_report"] = msg
                 self.history.write_log(msg)
                 break

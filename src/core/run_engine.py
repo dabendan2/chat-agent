@@ -80,7 +80,11 @@ async def main():
             engine.lock = lock
             
             final_report = await engine.run()
-            if final_report and ("[SILENT_RESTART_NEEDED]" in final_report or "[OWNER_INPUT_NEEDED]" in final_report or "Error" in final_report or "Failed" in final_report):
+            if final_report and "[SILENT_RESTART_NEEDED]" in final_report:
+                # 靜默重啟不使用 ERROR 前綴，直接輸出指令標籤
+                print(final_report)
+                sys.exit(1)
+            elif final_report and ("[OWNER_INPUT_NEEDED]" in final_report or "Error" in final_report or "Failed" in final_report):
                 print(f"ERROR: {final_report}")
                 sys.exit(1)
             elif final_report is None:
