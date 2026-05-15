@@ -246,6 +246,12 @@ class ChatEngine:
                 
                 # 處理文字訊息
                 text_to_send = result["text"]
+                
+                # 冪等性檢查：如果 text_to_send 已經在歷史紀錄（DOM 或 Log）中發送過，則靜默跳過
+                if text_to_send and text_to_send in self.state["sent_messages"]:
+                    self.history.write_log(f"IDEMPOTENCY: Message '{text_to_send}' already sent. Skipping.")
+                    text_to_send = None
+
                 if not text_to_send and result.get("images"):
                     text_to_send = "傳送圖片如下："
 
