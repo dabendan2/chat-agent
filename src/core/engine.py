@@ -172,6 +172,10 @@ class ChatEngine:
         reply_text = re.sub(r'\[TOOL_ACCESS_NEEDED,.*?\]', '', reply_text)
         reply_text = re.sub(r'\[IMAGE,.*?\]', '', reply_text)
         reply_text = reply_text.replace("[WAIT_FOR_TARGET_REPLY]", "").replace("[WAIT_FOR_USER_INPUT]", "").strip()
+        
+        # FINAL GUIDANCE ENFORCEMENT: Strip ANY remaining bracketed content to prevent leaks
+        # (e.g., custom abbreviations like [Hermes] or hallucinated technical tags)
+        reply_text = re.sub(r'\[.*?\]', '', reply_text).strip()
 
         return {
             "text": reply_text,

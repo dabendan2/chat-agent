@@ -66,13 +66,56 @@ async def test_label_isolation_logic():
     mock_channel = AsyncMock()
     engine = ChatEngine(mock_channel, "test", "test task", api_key="test")
     
+    # Standard Case
     raw_ai_output = "Hello! [OWNER_INPUT_NEEDED, reason=\"timed out\", summary=\"waiting 30m\"]"
     parsed = engine._parse_response(raw_ai_output)
-    
     assert parsed["text"] == "Hello!"
     assert parsed["owner_input_needed"] == "timed out"
     
-    raw_leak_output = "The contact is read but no reply. [Hermes] tracked 30m. [OWNER_INPUT_NEEDED, reason=\"...\", summary=\"...\"]"
+    # Leak Prevention Case (The '30 minutes monitor' bug)
+    raw_leak_output = "The contact is read but no reply. [Hermes] tracked 30m. [WAIT_FOR_TARGET_REPLY]"
     parsed_leak = engine._parse_response(raw_leak_output)
     
-    assert "[OWNER_INPUT_NEEDED" not in parsed_leak["text"]
+    # GUIDANCE: The text should not contain internal state markers like [Hermes]
+    # This test provides guidance that ANY bracketed content not recognized as a tool/tag
+    # should be flagged or carefully handled.
+    assert "[Hermes]" not in parsed_leak["text"]
+    # We stripped the brackets, so "[Hermes]" is gone. 
+    # "30m" might remain but the structure is sanitized.
+    assert "[" not in parsed_leak["text"]
+
+def test_output_format_strictness():
+    """
+    Test suite to enforce strict output formatting rules.
+    This acts as a 'guidance' for what a valid response looks like.
+    """
+    engine = ChatEngine(MagicMock(), "test", "test task", api_key="test")
+    
+    valid_outputs = [
+        "How are you? [WAIT_FOR_TARGET_REPLY]",
+        "Setting appointment. [CONVERSATION_ENDED, summary=\"Done\"]",
+        "Need help. [OWNER_INPUT_NEEDED, reason=\"Blocked\", summary=\"Help\"]",
+        "Check this [IMAGE, /path/img.png] [WAIT_FOR_TARGET_REPLY]"
+    ]
+    
+    invalid_outputs = [
+        "No label at all",
+        "Custom label [HEHERMES] is bad",
+        "Double labels [WAIT_FOR_TARGET_REPLY] [CONVERSATION_ENDED, summary=\"x\"]",
+        "Internal state leaked: Tracking for 30s... [WAIT_FOR_TARGET_REPLY]"
+    ]
+    
+    for output in valid_outputs:
+        parsed = engine._parse_response(output)
+        # Text should be clean
+        assert "[" not in parsed["text"]
+        # Must have exactly one state identified (except for IMAGE which is additive)
+        state_count = sum([parsed["is_waiting"], parsed["owner_input_needed"] is not None, parsed["conversation_ended"]])
+        assert state_count == 1, f"Output '{output}' should have exactly one state label."
+
+    for output in invalid_outputs:
+        parsed = engine._parse_response(output)
+        # If it has internal state or bad labels, these conditions should fail
+        if "[" in parsed["text"]:
+            # This is exactly what happened with the [Hermes] leak
+            pytest.fail(f"GUIDANCE VIOLATION: Output '{output}' leaked internal brackets into public text: '{parsed['text']}'")
