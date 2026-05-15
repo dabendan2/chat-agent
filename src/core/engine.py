@@ -161,7 +161,7 @@ class ChatEngine:
         return prompt
 
     def _parse_response(self, full_text: str) -> Dict[str, Any]:
-        waiting_match = "[WAIT_FOR_USER_INPUT]" in full_text
+        waiting_match = "[WAIT_FOR_TARGET_REPLY]" in full_text or "[WAIT_FOR_USER_INPUT]" in full_text
         owner_input_match = re.search(r'\[OWNER_INPUT_NEEDED,\s*reason="([^"]+)"(?:,\s*summary="([^"]+)")?\]', full_text)
         convo_ended_match = re.search(r'\[CONVERSATION_ENDED,\s*summary="([^"]+)"\]', full_text)
         tool_match = re.search(r'\[TOOL_ACCESS_NEEDED,\s*tool="([^"]+)",\s*query="([^"]+)"\]', full_text)
@@ -172,7 +172,7 @@ class ChatEngine:
         reply_text = re.sub(r'\[CONVERSATION_ENDED,.*?\]', '', reply_text)
         reply_text = re.sub(r'\[TOOL_ACCESS_NEEDED,.*?\]', '', reply_text)
         reply_text = re.sub(r'\[IMAGE,.*?\]', '', reply_text)
-        reply_text = reply_text.replace("[WAIT_FOR_USER_INPUT]", "").strip()
+        reply_text = reply_text.replace("[WAIT_FOR_TARGET_REPLY]", "").replace("[WAIT_FOR_USER_INPUT]", "").strip()
 
         return {
             "text": reply_text,

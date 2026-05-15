@@ -6,14 +6,14 @@ def test_parse_response_with_image():
     engine = ChatEngine(channel=MagicMock(), chat_name="Test", task="Test Task")
     
     # Case 1: Multiple images
-    text = "Here are the pics [IMAGE, /path/1.jpg] [IMAGE, /path/2.jpg] [WAIT_FOR_USER_INPUT]"
+    text = "Here are the pics [IMAGE, /path/1.jpg] [IMAGE, /path/2.jpg] [WAIT_FOR_TARGET_REPLY]"
     res = engine._parse_response(text)
     assert res["text"] == "Here are the pics"
     assert res["images"] == ["/path/1.jpg", "/path/2.jpg"]
     assert res["is_waiting"] is True
 
     # Case 2: No images
-    text = "No images here [WAIT_FOR_USER_INPUT]"
+    text = "No images here [WAIT_FOR_TARGET_REPLY]"
     res = engine._parse_response(text)
     assert res["text"] == "No images here"
     assert res["images"] == []
@@ -33,7 +33,7 @@ async def test_generate_and_send_reply_with_image():
 
     # Mock AI response
     mock_ai_resp = MagicMock()
-    mock_ai_resp.text = "Look at this [IMAGE, /tmp/test.jpg] [WAIT_FOR_USER_INPUT]"
+    mock_ai_resp.text = "Look at this [IMAGE, /tmp/test.jpg] [WAIT_FOR_TARGET_REPLY]"
     engine.client.models.generate_content.return_value = mock_ai_resp
 
     await engine.generate_and_send_reply([])

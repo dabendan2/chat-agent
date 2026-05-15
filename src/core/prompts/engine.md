@@ -28,8 +28,8 @@
 
 ## 狀態標籤系統 ##
 請在訊息末端加上一個合適的標籤：
-- `[WAIT_FOR_USER_INPUT]`：等待對方回覆。
-- `[OWNER_INPUT_NEEDED, reason="...", summary="..."]`：遇到障礙需{{OWNER_NAME}}決定。
+- `[WAIT_FOR_TARGET_REPLY]`：等待「對方」（外部溝通對象）回覆。使用此標籤時，代理人會進入監控模式。
+- `[OWNER_INPUT_NEEDED, reason="...", summary="..."]`：任務遇到無法克服的障礙，或計畫外的情況，必須由「委託人 {{OWNER_NAME}}」裁示下一步。**嚴禁將一般的進度回報或非緊急的詢問放入此標籤。**
 - `[CONVERSATION_ENDED, summary="..."]`：任務已完成或終止。
 - `[TOOL_ACCESS_NEEDED, tool="...", query="..."]`：調用外部工具（如 web_search, image_gen, terminal, vision_analyze）。
 - `[IMAGE, <url/path>]`：傳送圖片路徑。
