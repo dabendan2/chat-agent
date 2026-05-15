@@ -143,7 +143,12 @@ class ChatEngine:
         target_display = f"**{self.state['service_target']}**"
         prompt = prompt.replace("完成以下任務計畫", f"為 {target_display} 完成以下任務計畫")
         
-        prompt = prompt.replace("{{task_description}}", self.task_description)
+        # 注入任務啟動狀態提示
+        status_note = ""
+        if self.state.get("is_started"):
+            status_note = "\n**注意：此任務已在進行中。請檢查歷史紀錄，確認你是否已經執行過計畫的初期階段，避免重複發送相同的訊息。**\n"
+        
+        prompt = prompt.replace("{{task_description}}", f"{status_note}{self.task_description}")
         prompt = prompt.replace("{{intro_instruction}}", intro_instruction)
         prompt = prompt.replace("{{HERMES_PREFIX}}", HERMES_PREFIX)
         prompt = prompt.replace("{{etiquette}}", self.etiquette)
@@ -339,15 +344,12 @@ class ChatEngine:
 
         self.state.update(self.history.rebuild_state(msgs or [], self.task_description))
         
-        # 完全依據分析器的 is_started 決定是否需要啟動回覆 (Analyzer is the SSOT)
-        startup_action_needed = not self.state.get("is_started", False)
-        
-        if not startup_action_needed:
-            self.history.write_log("DEBUG: Analyzer determined task is ALREADY STARTED. Entering monitor mode directly.")
-        
         try:
-            if startup_action_needed:
-                await self.generate_and_send_reply(msgs or [])
+            # 始終允許啟動時進行一次評估，由 AI 根據上下文決定是 [WAIT] 還是繼續行動
+            await self.generate_and_send_reply(msgs or [])
+        except Exception:
+            # generate_and_send_reply sets final_report on exception
+            return self.state.get("final_report")
         except Exception:
             # generate_and_send_reply sets final_report on exception
             return self.state.get("final_report")
