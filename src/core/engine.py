@@ -140,8 +140,7 @@ class ChatEngine:
         prompt = self.system_prompt_template
         
         # 注入服務對象到任務背景
-        target_display = f"**{self.state['service_target']}**"
-        prompt = prompt.replace("完成以下任務計畫", f"為 {target_display} 完成以下任務計畫")
+        prompt = prompt.replace("{{service_target}}", self.state['service_target'])
         
         # 注入任務啟動狀態提示
         status_note = ""
