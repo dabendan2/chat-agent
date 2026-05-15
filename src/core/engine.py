@@ -227,12 +227,6 @@ class ChatEngine:
 
     async def generate_and_send_reply(self, msgs: List[Dict[str, Any]]) -> None:
         """核心回覆邏輯：生成 AI 回應並處理工具調用"""
-        try:
-            self._check_spamming(msgs)
-        except Exception as e:
-            self.state["final_report"] = str(e)
-            raise e
-
         max_turns = 3  # 限制單次回覆循環內的工具調用次數，防止無限遞迴
         current_turn = 0
         
@@ -250,6 +244,13 @@ class ChatEngine:
                     text_to_send = "傳送圖片如下："
 
                 if text_to_send and text_to_send not in self.state["sent_messages"]:
+                    # 在真正發送前檢查 Spam Limit
+                    try:
+                        self._check_spamming(msgs)
+                    except Exception as e:
+                        self.state["final_report"] = str(e)
+                        raise e
+
                     await self.channel.send_message(text_to_send)
                     self.history.write_log(f"SENT: {text_to_send}")
                     self.state["sent_messages"].append(text_to_send.strip())
@@ -312,6 +313,8 @@ class ChatEngine:
                 break # 無工具需求也無特定狀態，正常結束
                 
             except Exception as e:
+                if "[OWNER_INPUT_NEEDED] SECURITY_PROTOCOL_ACTIVATED" in str(e):
+                    raise e
                 self.history.write_log(f"Error in generate_and_send_reply: {e}")
                 self.state["final_report"] = f"Error in generate_and_send_reply: {str(e)}"
                 break
@@ -335,7 +338,11 @@ class ChatEngine:
         self.state.update(self.history.rebuild_state(msgs or [], self.task_description))
         
         try:
-            await self.generate_and_send_reply(msgs or [])
+            # 僅在需要啟動動作（如：最後一則非 Hermes 發送或全新對話）時才立即回覆
+            if self.state.get("startup_action_needed"):
+                await self.generate_and_send_reply(msgs or [])
+            else:
+                self.history.write_log("DEBUG: Last message was from Hermes. Skipping startup reply and entering monitor mode.")
         except Exception:
             # generate_and_send_reply sets final_report on exception
             return self.state.get("final_report")
