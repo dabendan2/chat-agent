@@ -31,24 +31,10 @@ class HistoryManager:
                 sent_messages.append(text)
 
         state = {
-            "last_processed_msg": "",
+            "last_processed_msg": msgs[-1]["text"] if msgs else "",
             "sent_messages": sent_messages,
-            "exit_at": None,
-            "startup_action_needed": False
+            "exit_at": None
         }
-
-        if msgs:
-            latest = msgs[-1]
-            is_hermes = latest.get("sender") in ["Hermes", OWNER_NAME]
-            
-            if not is_hermes:
-                state["startup_action_needed"] = True
-                state["last_processed_msg"] = "___TAKEOVER___"
-            else:
-                state["startup_action_needed"] = False
-                state["last_processed_msg"] = latest["text"]
-        else:
-            state["startup_action_needed"] = True
 
         return state
 

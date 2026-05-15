@@ -89,8 +89,10 @@ class ChatEngine:
                 self.state["service_target"] = data["service_target"]
             if data.get("task_start_time"):
                 self.state["task_start_time"] = data["task_start_time"]
+            if data.get("is_started") is not None:
+                self.state["is_started"] = data["is_started"]
             
-            self.history.write_log(f"ANALYSIS: target='{self.state['service_target']}', start='{self.state['task_start_time']}'")
+            self.history.write_log(f"ANALYSIS: target='{self.state['service_target']}', start='{self.state['task_start_time']}', is_started={self.state.get('is_started')}")
         except Exception as e:
             self.history.write_log(f"Warning: Failed to analyze context: {e}")
         
@@ -337,12 +339,15 @@ class ChatEngine:
 
         self.state.update(self.history.rebuild_state(msgs or [], self.task_description))
         
+        # 完全依據分析器的 is_started 決定是否需要啟動回覆 (Analyzer is the SSOT)
+        startup_action_needed = not self.state.get("is_started", False)
+        
+        if not startup_action_needed:
+            self.history.write_log("DEBUG: Analyzer determined task is ALREADY STARTED. Entering monitor mode directly.")
+        
         try:
-            # 僅在需要啟動動作（如：最後一則非 Hermes 發送或全新對話）時才立即回覆
-            if self.state.get("startup_action_needed"):
+            if startup_action_needed:
                 await self.generate_and_send_reply(msgs or [])
-            else:
-                self.history.write_log("DEBUG: Last message was from Hermes. Skipping startup reply and entering monitor mode.")
         except Exception:
             # generate_and_send_reply sets final_report on exception
             return self.state.get("final_report")
