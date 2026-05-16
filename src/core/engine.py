@@ -160,7 +160,7 @@ class ChatEngine:
         return prompt
 
     def _parse_response(self, full_text: str) -> Dict[str, Any]:
-        waiting_match = "[WAIT_FOR_TARGET_REPLY]" in full_text or "[WAIT_FOR_USER_INPUT]" in full_text
+        waiting_match = re.search(r'\[WAIT_FOR_TARGET_REPLY(?:,\s*reason="([^"]+)")?\]', full_text)
         owner_input_match = re.search(r'\[OWNER_INPUT_NEEDED,\s*reason="([^"]+)"(?:,\s*summary="([^"]+)")?\]', full_text)
         convo_ended_match = re.search(r'\[CONVERSATION_ENDED,\s*summary="([^"]+)"\]', full_text)
         tool_match = re.search(r'\[TOOL_ACCESS_NEEDED,\s*tool="([^"]+)",\s*query="([^"]+)"\]', full_text)
@@ -171,7 +171,7 @@ class ChatEngine:
         reply_text = re.sub(r'\[CONVERSATION_ENDED,.*?\]', '', reply_text)
         reply_text = re.sub(r'\[TOOL_ACCESS_NEEDED,.*?\]', '', reply_text)
         reply_text = re.sub(r'\[IMAGE,.*?\]', '', reply_text)
-        reply_text = reply_text.replace("[WAIT_FOR_TARGET_REPLY]", "").replace("[WAIT_FOR_USER_INPUT]", "").strip()
+        reply_text = re.sub(r'\[WAIT_FOR_TARGET_REPLY.*?\]', '', reply_text).strip()
         
         # SURGICAL LEAK PREVENTION: Only strip brackets containing forbidden technical keywords.
         # This allows code like [1, 2, 3] or array[0] to pass through.
@@ -181,10 +181,11 @@ class ChatEngine:
 
         return {
             "text": reply_text,
-            "is_waiting": waiting_match,
+            "is_waiting": waiting_match is not None,
+            "waiting_reason": waiting_match.group(1) if waiting_match else None,
             "owner_input_needed": owner_input_match.group(1) if owner_input_match else None,
             "summary": (convo_ended_match.group(1) if convo_ended_match else 
-                        owner_input_match.group(2) if (owner_input_match and owner_input_match.lastindex >= 2) else None),
+                        owner_input_match.group(2) if (owner_input_match and owner_input_match.lastindex is not None and owner_input_match.lastindex >= 2) else None),
             "conversation_ended": convo_ended_match is not None,
             "tool_needed": {"tool": tool_match.group(1), "query": tool_match.group(2)} if tool_match else None,
             "images": [img.strip() for img in image_matches]
@@ -291,7 +292,8 @@ class ChatEngine:
 
                 # 判定後續行為
                 if result["is_waiting"]:
-                    self.history.write_log("DEBUG: [WAIT_FOR_USER_INPUT] detected. Waiting for store response.")
+                    reason_str = f" Reason: {result['waiting_reason']}" if result.get("waiting_reason") else ""
+                    self.history.write_log(f"DEBUG: [WAIT_FOR_TARGET_REPLY] detected.{reason_str} Waiting for store response.")
                     break  # 跳出循環，等待外部輪詢
                 
                 if result["owner_input_needed"]:

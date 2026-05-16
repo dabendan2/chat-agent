@@ -14,6 +14,7 @@ def test_engine_output_schema_guidance():
     # Guidance: Internal state brackets like [Hermes] are FORBIDDEN.
     test_outputs = [
         ("Message [WAIT_FOR_TARGET_REPLY]", "Message"),
+        ("Message [WAIT_FOR_TARGET_REPLY, reason=\"waiting for response\"]", "Message"),
         ("Result: [1, 2, 3] [WAIT_FOR_TARGET_REPLY]", "Result: [1, 2, 3]"),
         ("Leak: [Hermes] 30m [WAIT_FOR_TARGET_REPLY]", "Leak:  30m")
     ]
@@ -28,6 +29,12 @@ def test_engine_output_schema_guidance():
                      parsed["conversation_ended"] or 
                      parsed["tool_needed"])
         assert has_state, f"Output '{raw}' resulted in an undefined state."
+    
+    # Verify reason extraction
+    parsed_reason = engine._parse_response("Pls reply [WAIT_FOR_TARGET_REPLY, reason=\"asking time\"]")
+    assert parsed_reason["is_waiting"] is True
+    assert parsed_reason["waiting_reason"] == "asking time"
+    assert parsed_reason["text"] == "Pls reply"
 
 def test_analyzer_output_schema_guidance():
     required_keys = ["service_target", "current_progress", "task_start_time", "is_started"]

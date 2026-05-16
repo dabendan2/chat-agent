@@ -49,8 +49,8 @@ async def test_ai_should_ask_instead_of_answering():
     # Assertions for Questioning
     # 1. Should contain question-related keywords
     # The AI might use different words, just check if it ends with [WAIT_FOR_TARGET_REPLY] or similar
-    assert "[WAIT_FOR_TARGET_REPLY]" in response or "?" in response or "？" in response
-    
+    assert "[WAIT_FOR_TARGET_REPLY" in response or "?" in response or "？" in response
+
     # 2. Should NOT contain the definitive legal answer (which it previously hallucinated/auto-answered)
     # The problematic answer contained "現行交通法規", "強制繫安全帶", "罰款" etc.
     forbidden_content = ["現行交通法規", "強制繫安全帶", "均須強制"]
@@ -58,4 +58,4 @@ async def test_ai_should_ask_instead_of_answering():
         assert forbidden not in response, f"AI should not provide the answer '{forbidden}' when asked to query the user."
 
     # 3. Should be waiting for input
-    assert "[WAIT_FOR_TARGET_REPLY]" in response
+    assert "[WAIT_FOR_TARGET_REPLY" in response
