@@ -173,9 +173,11 @@ class ChatEngine:
         reply_text = re.sub(r'\[IMAGE,.*?\]', '', reply_text)
         reply_text = reply_text.replace("[WAIT_FOR_TARGET_REPLY]", "").replace("[WAIT_FOR_USER_INPUT]", "").strip()
         
-        # FINAL GUIDANCE ENFORCEMENT: Strip ANY remaining bracketed content to prevent leaks
-        # (e.g., custom abbreviations like [Hermes] or hallucinated technical tags)
-        reply_text = re.sub(r'\[.*?\]', '', reply_text).strip()
+        # SURGICAL LEAK PREVENTION: Only strip brackets containing forbidden technical keywords.
+        # This allows code like [1, 2, 3] or array[0] to pass through.
+        forbidden_keywords = r"Hermes|代理人|Owner|委託人|監控|系統|逾時|時限|進度|執行計畫"
+        leak_pattern = rf"\[.*?(?:{forbidden_keywords}).*?\]"
+        reply_text = re.sub(leak_pattern, '', reply_text, flags=re.IGNORECASE).strip()
 
         return {
             "text": reply_text,
