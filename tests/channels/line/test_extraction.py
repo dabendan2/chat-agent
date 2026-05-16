@@ -83,3 +83,44 @@ async def test_extract_messages_chronological_order():
     # In the final list, the first item should be the older one
     assert result[0]["text"] == "First"
     assert result[-1]["text"] == "Second"
+
+@pytest.mark.asyncio
+async def test_js_order_logic_fix():
+    """
+    Verify the JS string in line_utils correctly handles the LINE Extension DOM 
+    quirk: Newest messages appear first in DOM traversal.
+    We require results.reverse() to convert to Oldest First for the engine.
+    """
+    # Read the JS string from driver.py
+    src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../src/channels/line/driver.py")
+    with open(src_path, "r") as f:
+        content = f.read()
+    
+    assert "results.reverse()" in content
+
+@pytest.mark.asyncio
+async def test_self_detection_logic():
+    """
+    Verify the self-detection logic uses data-direction='reverse', 
+    which is the most reliable indicator in the current LINE Extension DOM.
+    """
+    src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../src/channels/line/driver.py")
+    with open(src_path, "r") as f:
+        content = f.read()
+        
+    assert "el.getAttribute('data-direction')" in content
+    assert "direction === 'reverse'" in content
+
+@pytest.mark.asyncio
+async def test_timestamp_inheritance_logic():
+    """
+    Verify the JS string contains the logic to inherit timestamps 
+    for clustered messages from the same sender.
+    """
+    src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../src/channels/line/driver.py")
+    with open(src_path, "r") as f:
+        content = f.read()
+        
+    assert "TIME INHERITANCE" in content
+    assert "chronMessages[i].timestamp = chronMessages[i+1].timestamp" in content
+    assert "chronMessages[i].sender === chronMessages[i+1].sender" in content

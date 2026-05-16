@@ -12,11 +12,10 @@ ENV_PATH = Path.home() / ".hermes" / ".env"
 # Load environment variables
 load_dotenv(ENV_PATH)
 
-# ... (其餘不變)
-
 # Ensure directories exist
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(FILE_CACHE_DIR, exist_ok=True)
+
 # Browser Configuration
 CDP_PORT = 9222
 DEFAULT_PROFILE = "line_booking_session"
@@ -30,7 +29,7 @@ OWNER_NAME = os.environ.get("LINE_OWNER_NAME", "Owner")
 LINE_EMAIL = os.environ.get("LINE_EMAIL")
 LINE_PASSWORD = os.environ.get("LINE_PASSWORD")
 HERMES_PREFIX = "[Hermes]"
-INTRO_PHRASE = f"您好，我是 {OWNER_NAME} 的AI代理 Hermes。"
+INTRO_PHRASE = "您好，我是 {{OWNER_NAME}} 的AI代理 Hermes。"
 
 # Timing and Timeouts
 SEARCH_TIMEOUT = 10000
@@ -58,6 +57,3 @@ MESSAGE_CONTENT_SELECTOR = '[class*="content_inner"], [class*="textMessageConten
 MESSAGE_TIME_SELECTOR = '[class*="time"], [class*="metaInfo-module__time"]'
 SENDER_NAME_SELECTOR = '[class*="username-module__username"], [class*="sender"]'
 FILE_INPUT_SELECTOR = 'input[type="file"]'
-
-# Ensure directories exist
-os.makedirs(LOG_DIR, exist_ok=True)

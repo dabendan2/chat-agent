@@ -207,7 +207,14 @@ async def get_messages(chat_name: str, limit: int = 10, chat_id: Optional[str] =
             if selection.get("status") != "success": return json.dumps(selection)
             
             messages = await channel_inst.extract_messages(limit=limit)
-            response = {"status": "success", "channel": channel, "chat": chat_name, "count": len(messages), "messages": messages}
+            response = {
+                "status": "success", 
+                "channel": channel, 
+                "chat": chat_name, 
+                "owner_name": OWNER_NAME,
+                "count": len(messages), 
+                "messages": messages
+            }
             if len(messages) == 0:
                 screenshot_path = SCREENSHOT_DIR / f"empty_chat_{channel}_{chat_name}.png"
                 await page.screenshot(path=screenshot_path)

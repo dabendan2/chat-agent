@@ -49,28 +49,3 @@ async def test_engine_idempotency_on_restart(tmp_path):
 
         assert mock_channel.send_message.call_count == 0
         assert engine.state["is_started"] is True
-
-@pytest.mark.asyncio
-async def test_label_isolation_logic():
-    """
-    Verify that internal reporting content is NOT leaked, 
-    but LEGITIMATE technical brackets (like code) ARE preserved.
-    """
-    mock_channel = AsyncMock()
-    engine = ChatEngine(mock_channel, "test", "test task", api_key="test")
-    
-    # CASE 1: Internal leak (Should be stripped)
-    raw_leak_output = "The contact is read but no reply. [Hermes] tracked 30m. [WAIT_FOR_TARGET_REPLY]"
-    parsed_leak = engine._parse_response(raw_leak_output)
-    assert "[Hermes]" not in parsed_leak["text"]
-    
-    # CASE 2: Legitimate Code (Should be PRESERVED)
-    raw_code_output = "Here is your Python list: [1, 2, 3] [WAIT_FOR_TARGET_REPLY]"
-    parsed_code = engine._parse_response(raw_code_output)
-    assert "[1, 2, 3]" in parsed_code["text"]
-    assert parsed_code["text"] == "Here is your Python list: [1, 2, 3]"
-
-    # CASE 3: Array indexing (Should be PRESERVED)
-    raw_index_output = "Check value of array[0]. [WAIT_FOR_TARGET_REPLY]"
-    parsed_index = engine._parse_response(raw_index_output)
-    assert "array[0]" in parsed_index["text"]

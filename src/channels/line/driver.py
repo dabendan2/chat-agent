@@ -538,6 +538,11 @@ async def send_message(page: Any, text: str) -> None:
         print("禁止代理直接使用")
         raise PermissionError("Access Denied.")
 
+    # 1. 佔位符替換 (在發言前一刻從環境變數讀入)
+    from utils.config import OWNER_NAME
+    text = text.replace("{{OWNER_NAME}}", OWNER_NAME)
+
+    # 2. 強制前綴
     if not text.startswith(HERMES_PREFIX):
         text = f"{HERMES_PREFIX} {text}"
 

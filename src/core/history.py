@@ -1,6 +1,6 @@
 import time
 from typing import List, Dict, Any
-from utils.config import LOG_DIR, OWNER_NAME
+from utils.config import LOG_DIR
 
 class HistoryManager:
     def __init__(self, chat_name: str) -> None:
@@ -27,7 +27,8 @@ class HistoryManager:
 
         for m in msgs:
             text = m["text"].strip()
-            if m.get("sender") in ["Hermes", OWNER_NAME] and text not in sent_messages:
+            # 只根據 Hermes 前綴或 Sender 標籤判定為自己
+            if m.get("sender") == "Hermes" and text not in sent_messages:
                 sent_messages.append(text)
 
         state = {
@@ -39,22 +40,15 @@ class HistoryManager:
         return state
 
     def get_full_context(self, msgs: List[Dict[str, Any]], sent_messages: List[str]) -> List[str]:
-        # Merge DOM messages with internally tracked sent messages (which include tool outputs)
-        # to ensure the AI knows what it has already done/discovered.
         context = []
-        
-        # 1. Start with DOM history
         for m in msgs:
             text = m["text"].strip()
             timestamp = m.get("timestamp", "Unknown Time")
             sender = m.get("sender", "Unknown")
             context.append(f"[{timestamp}] {sender}: {text}")
             
-        # 2. Append internally tracked but NOT-YET-SENT status updates (like Tool Results)
-        # These are in sent_messages but might not be in the DOM yet or at all.
         for internal_msg in sent_messages:
             if "[系統通知] 工具執行成功" in internal_msg or "[系統通知] 工具執行結果" in internal_msg:
-                # Check if this specific result is already reflected in the context
                 if internal_msg not in "\n".join(context):
                     context.append(f"[Internal Log] {internal_msg}")
                     
