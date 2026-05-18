@@ -2,6 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 from core.engine import ChatEngine
+from utils.config import HERMES_PREFIX
 
 @pytest.mark.asyncio
 async def test_spamming_check_blocks_at_quota_limit():
@@ -81,5 +82,5 @@ async def test_engine_adds_image_prefix_if_text_missing():
         
         # Check if the prefix message was sent
         sent_texts = [call.args[0] for call in mock_channel.send_message.call_args_list]
-        assert "傳送圖片如下：" in sent_texts
+        assert f"{HERMES_PREFIX} 傳送圖片如下：" in sent_texts
         assert mock_channel.send_image.called

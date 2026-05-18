@@ -542,14 +542,17 @@ async def send_message(page: Any, text: str) -> None:
     from utils.config import OWNER_NAME
     text = text.replace("{{OWNER_NAME}}", OWNER_NAME)
 
-    # 2. 強制前綴
-    if not text.startswith(HERMES_PREFIX):
-        text = f"{HERMES_PREFIX} {text}"
+    # 2. 強制前綴與多行拆分 (防止 LINE 擴充功能自動拆分導致後續對話框失去標籤)
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    for line in lines:
+        if not line.startswith(HERMES_PREFIX):
+            line = f"{HERMES_PREFIX} {line}"
 
-    message_area = page.locator(MESSAGE_INPUT_SELECTOR).first
-    await message_area.click()
-    await page.keyboard.type(text)
-    await page.keyboard.press("Enter")
+        message_area = page.locator(MESSAGE_INPUT_SELECTOR).first
+        await message_area.click()
+        await page.keyboard.type(line)
+        await page.keyboard.press("Enter")
+        await asyncio.sleep(1) # 稍微等待確保順序與穩定性
 
 async def send_image(page: Any, image_path: str) -> None:
     # 安全檢查

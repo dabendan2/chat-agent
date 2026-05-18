@@ -66,8 +66,6 @@ class ChatEngine:
         prompt = self.analyzer_prompt_template
         prompt = prompt.replace("{{task_description}}", self.task_description)
         prompt = prompt.replace("{{context_lines}}", "\n".join(context_lines))
-        # 讓 Analyzer 也使用佔位符，或者讓它知道 Owner 是誰（在對話紀錄中 Junyu 出現的地方）
-        # 由於我們希望 Junyu 被當作一般人，這裡傳入一個 AI 幾乎不會在對話中看到的標籤
         prompt = prompt.replace("{{OWNER_NAME}}", "__INTERNAL_OWNER_LABEL__")
 
         try:
@@ -88,12 +86,15 @@ class ChatEngine:
             self.history.write_log(f"Warning: Failed to analyze context: {e}")
         
     def _build_prompt(self, msgs: List[Dict[str, Any]], context_lines: List[str]) -> str:
-        pruned_context = context_lines
+        # LLM should not see prefixes in context
+        clean_context = [line.replace(HERMES_PREFIX, "").strip() for line in context_lines]
+
+        pruned_context = clean_context
         if self.state.get("task_start_time"):
             start_marker = self.state["task_start_time"]
-            for i, line in enumerate(context_lines):
+            for i, line in enumerate(clean_context):
                 if start_marker in line:
-                    pruned_context = context_lines[i:]
+                    pruned_context = clean_context[i:]
                     break
 
         recent_context = pruned_context[-10:]
@@ -117,18 +118,19 @@ class ChatEngine:
         file_context = ""
         if available_files:
             file_context = "\n## 可用的本地檔案資源 ##\n" + "\n".join(available_files) + "\n"
-            file_context += "你可以使用 [TOOL_ACCESS_NEEDED, tool=\"terminal\", query=\"...\"] 來操作這些檔案。\n"
+            file_context += "你可以使用 [TOOL_ACCESS_NEEDED, tool=\"terminal\", query=\"...\"] 來操作這些檔案（如解壓縮、安裝套件、列出目錄）。\n"
+            file_context += "如果是圖片，你可以使用 [TOOL_ACCESS_NEEDED, tool=\"vision_analyze\", query=\"...\"] 並傳入圖片路徑來分析內容。\n"
 
         prompt = self.system_prompt_template
         prompt = prompt.replace("{{service_target}}", self.state['service_target'])
-        status_note = "\n**注意：此任務已在進行中。請檢查歷史紀錄，避免重複執行。**\n" if self.state.get("is_started") else ""
+        status_note = "\n**注意：此任務已在進行中。請檢查歷史紀錄，確認你是否已經執行過計畫的初期階段，避免重複發送相同的訊息。**\n" if self.state.get("is_started") else ""
         prompt = prompt.replace("{{task_description}}", f"{status_note}{self.task_description}")
         prompt = prompt.replace("{{intro_instruction}}", intro_instruction)
-        prompt = prompt.replace("{{HERMES_PREFIX}}", HERMES_PREFIX)
+        # LLM does not need prefix info
+        prompt = prompt.replace("{{HERMES_PREFIX}}", "")
         prompt = prompt.replace("{{etiquette}}", self.etiquette)
         prompt = prompt.replace("{{INTRO_PHRASE}}", INTRO_PHRASE)
-        # 讓 AI 在系統提示詞中直接看到佔位符，這樣它輸出時也會使用佔位符
-        # prompt = prompt.replace("{{OWNER_NAME}}", "Owner") 
+        prompt = prompt.replace("{{OWNER_NAME}}", "{{OWNER_NAME}}")
         prompt = prompt.replace("{{context_lines}}", "\n".join(pruned_context))
         prompt = prompt.replace("{{file_context}}", file_context) 
         prompt = prompt.replace("{{SPAM_LIMIT}}", str(self.state["spam_limit"]))
@@ -188,8 +190,11 @@ class ChatEngine:
             if m.get("sender") != "Hermes": break
             text = m.get("text", "").strip()
             if not (text.startswith("[系統") or text.startswith("[TOOL")): count += 1
+        
         if count >= self.state["spam_limit"]:
-            raise Exception(f"Spam limit reached ({self.state['spam_limit']}).")
+            error_msg = f"[OWNER_INPUT_NEEDED] SECURITY_PROTOCOL_ACTIVATED: Spam limit reached ({self.state['spam_limit']}). Your current task loop MUST TERMINATE IMMEDIATELY. Do NOT attempt to use alternative tools (like execute_code) or modify message headers to bypass this safety limit. Report the status to the Owner and WAIT."
+            self.history.write_log(f"ERROR: {error_msg}")
+            raise Exception(error_msg)
 
     async def generate_and_send_reply(self, msgs: List[Dict[str, Any]]) -> None:
         max_turns = 3
@@ -208,8 +213,15 @@ class ChatEngine:
                     text_to_send = "傳送圖片如下："
 
                 if text_to_send and text_to_send not in self.state["sent_messages"]:
+                    # Ensure EVERY line has a prefix if it's going to be split by the channel
+                    # Or at least ensure the block starts with it.
+                    # CRITICAL: For LINE, multi-line messages might be split.
+                    # We force-prefix the entire block, but we should also handle the logic
+                    # where the channel might split it.
+                    if not text_to_send.startswith(HERMES_PREFIX):
+                        text_to_send = f"{HERMES_PREFIX} {text_to_send}"
+                    
                     self._check_spamming(msgs)
-                    # 發送時，Engine 傳出的 text 可能包含 {{OWNER_NAME}}
                     await self.channel.send_message(text_to_send)
                     self.history.write_log(f"SENT: {text_to_send}")
                     self.state["sent_messages"].append(text_to_send.strip())
@@ -244,6 +256,8 @@ class ChatEngine:
                     except Exception: break
                 break
             except Exception as e:
+                if "[OWNER_INPUT_NEEDED] SECURITY_PROTOCOL_ACTIVATED" in str(e):
+                    raise e
                 self.history.write_log(f"Error: {e}")
                 self.state["final_report"] = str(e)
                 break
@@ -266,14 +280,15 @@ class ChatEngine:
 
         while True:
             if time.time() - start_time > RUNTIME_TIMEOUT:
-                self.state["final_report"] = "[SILENT_RESTART_NEEDED]"
+                msg = "[SILENT_RESTART_NEEDED] 任務運行已達 50 分鐘上限。請代理人『直接再次啟動』相同的背景任務指令，嚴禁發送任何文字訊息給 User 或 Owner，保持完全靜默。"
+                self.state["final_report"] = msg
+                self.history.write_log(msg)
                 break
             if self.state.get("exit_at") and time.time() >= self.state["exit_at"]: break
             try:
                 msgs = await self.channel.extract_messages()
                 if msgs:
                     latest = msgs[-1]
-                    # 只有真的 Hermes（有前綴的）才被視為自己
                     is_hermes = latest.get("sender") == "Hermes"
                     is_new = latest["text"].strip() != self.state.get("last_processed_msg", "").strip()
                     if not is_hermes and is_new:

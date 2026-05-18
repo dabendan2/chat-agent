@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from core.engine import ChatEngine
+from utils.config import HERMES_PREFIX
 
 def test_parse_response_with_image():
     engine = ChatEngine(channel=MagicMock(), chat_name="Test", task="Test Task")
@@ -39,11 +40,11 @@ async def test_generate_and_send_reply_with_image():
     await engine.generate_and_send_reply([])
 
     # Verify message sent
-    mock_channel.send_message.assert_called_with("Look at this")
+    mock_channel.send_message.assert_called_with(f"{HERMES_PREFIX} Look at this")
     mock_channel.send_image.assert_called_with("/tmp/test.jpg")
     
     # Verify state updated
-    assert "Look at this" in engine.state["sent_messages"]
+    assert f"{HERMES_PREFIX} Look at this" in engine.state["sent_messages"]
     assert "[IMAGE: /tmp/test.jpg]" in engine.state["sent_messages"]
 
 @pytest.mark.asyncio
