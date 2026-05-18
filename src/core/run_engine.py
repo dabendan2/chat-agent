@@ -16,6 +16,11 @@ from core.engine import ChatEngine
 from utils.locker import PIDLock
 from utils.config import CDP_PORT, DEFAULT_MODEL, OWNER_NAME
 
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = None
+
 async def main():
     parser = argparse.ArgumentParser(description="Chat Agent Proxy Engine CLI")
     parser.add_argument("--channel", default="line", help="Communication channel (e.g., line, messenger)")
@@ -25,6 +30,10 @@ async def main():
     parser.add_argument("--port", type=int, default=CDP_PORT, help="CDP port")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Gemini model name")
     args = parser.parse_args()
+
+    # Set process title for reliable identification by remove_task
+    if setproctitle:
+        setproctitle(f"chat-agent:{args.channel}:{args.chat_name}")
 
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:

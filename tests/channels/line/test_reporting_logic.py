@@ -19,7 +19,8 @@ async def test_summary_extraction():
     mock_channel = AsyncMock()
     # Mocking Client to avoid real API calls
     with patch("google.genai.Client"), \
-         patch("core.history.HistoryManager.write_log"):
+         patch("core.history.HistoryManager.write_log"), \
+         patch("os.path.exists", return_value=False):
         proxy = ChatEngine(channel=mock_channel, chat_name="test", task="測試彙整", api_key=TEST_KEY_VALUE)
         
         # Test case 1: Successful summary extraction
@@ -38,7 +39,8 @@ async def test_last_summary_overwrites():
          patch("channels.line.driver.extract_messages", new_callable=AsyncMock, return_value=[]), \
          patch("channels.line.driver.select_chat", new_callable=AsyncMock, return_value={"status": "success"}), \
          patch("google.genai.Client"), \
-         patch("core.history.HistoryManager.write_log"):
+         patch("core.history.HistoryManager.write_log"), \
+         patch("os.path.exists", return_value=False):
          
         proxy = ChatEngine(channel=mock_channel, chat_name="test", task="測試彙整覆蓋", api_key=TEST_KEY_VALUE)
         res1 = MockResponse('再見。[CONVERSATION_ENDED, summary="報告A"]')

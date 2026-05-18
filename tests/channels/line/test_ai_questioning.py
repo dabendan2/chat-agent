@@ -15,7 +15,8 @@ async def run_ai_test(task, history):
     mock_page.bring_to_front = AsyncMock()
     with patch("channels.line.driver.send_message", new_callable=AsyncMock) as mock_send, \
          patch("channels.line.driver.extract_messages", new_callable=AsyncMock, return_value=[]), \
-         patch("channels.line.driver.select_chat", new_callable=AsyncMock, return_value={"status": "success"}):
+         patch("channels.line.driver.select_chat", new_callable=AsyncMock, return_value={"status": "success"}), \
+         patch("os.path.exists", return_value=False):
         mock_channel = AsyncMock(); mock_channel.bring_to_front = AsyncMock(); proxy = ChatEngine(channel=mock_channel, chat_name="test", task=task, api_key=TEST_KEY_VALUE)
         captured_full_text = []
         original_parse = proxy._parse_response

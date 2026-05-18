@@ -29,7 +29,8 @@ async def test_spam_control_with_chain_break_fix():
     engine = ChatEngine(mock_channel, "test_chat", "test_task", api_key="test_key")
     
     with patch("google.genai.Client"), \
-         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"):
+         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"), \
+         patch("os.path.exists", return_value=False): # Bypass physical log check
         
         engine.client.models.generate_content = MagicMock()
         mock_response = MagicMock()
@@ -49,7 +50,8 @@ async def test_engine_forces_prefix_on_ai_output():
     engine = ChatEngine(mock_channel, "test_chat", "test_task", api_key="test_key")
     
     with patch("google.genai.Client"), \
-         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"):
+         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"), \
+         patch("os.path.exists", return_value=False): # Bypass physical log check
         
         engine.client.models.generate_content = MagicMock()
         mock_response = MagicMock()

@@ -261,5 +261,50 @@ async def run_task(chat_name: str, task: str, channel: str = "line", chat_id: Op
         })
     except Exception as e: return f"Error running task: {str(e)}"
 
+@mcp.tool()
+async def remove_task(chat_name: str, channel: str = "line") -> str:
+    """Safely terminates any background tasks associated with a specific chat name and cleans up locks."""
+    import signal
+    import psutil
+    
+    results = {"status": "success", "terminated_pids": [], "cleaned_locks": []}
+    target_title = f"chat-agent:{channel}:{chat_name}"
+    
+    # 1. Terminate matching processes
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                # 優先使用精確的 Process Title 識別
+                proc_name = proc.name()
+                cmdline = proc.info.get('cmdline') or []
+                cmd_str = " ".join(cmdline)
+                
+                is_match = (proc_name == target_title or 
+                           (target_title in proc_name) or
+                           ("run_engine.py" in cmd_str and chat_name in cmd_str and channel in cmd_str))
+                
+                if is_match:
+                    pid = proc.info['pid']
+                    proc.send_signal(signal.SIGKILL)
+                    results["terminated_pids"].append(pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception as e:
+        return json.dumps({"status": "error", "error": f"Failed to kill processes: {str(e)}"})
+
+    # 2. Cleanup PID locks
+    lock_name = f"{channel}_{chat_name}.pid".replace(" ", "_")
+    from utils.config import DATA_DIR
+    lock_path = DATA_DIR / "locks" / lock_name
+    
+    if lock_path.exists():
+        try:
+            lock_path.unlink()
+            results["cleaned_locks"].append(str(lock_path))
+        except Exception as e:
+            results["lock_cleanup_error"] = str(e)
+
+    return json.dumps(results)
+
 if __name__ == "__main__":
     mcp.run()

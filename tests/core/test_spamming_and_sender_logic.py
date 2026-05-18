@@ -21,7 +21,8 @@ async def test_spamming_check_blocks_at_quota_limit():
     engine = ChatEngine(mock_channel, "test_chat", "test_task", api_key="test_key")
     
     with patch("google.genai.Client"), \
-         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"):
+         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"), \
+         patch("os.path.exists", return_value=False): # Bypass physical log check in tests
         
         engine.client.models.generate_content = MagicMock()
         mock_response = MagicMock()
@@ -47,7 +48,8 @@ async def test_spamming_check_allows_if_interrupted():
     engine = ChatEngine(mock_channel, "test_chat", "test_task", api_key="test_key")
     
     with patch("google.genai.Client"), \
-         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"):
+         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"), \
+         patch("os.path.exists", return_value=False): # Bypass physical log check in tests
         
         engine.client.models.generate_content = MagicMock()
         mock_response = MagicMock()
@@ -70,7 +72,8 @@ async def test_engine_adds_image_prefix_if_text_missing():
     engine = ChatEngine(mock_channel, "test_chat", "test_task", api_key="test_key")
     
     with patch("google.genai.Client"), \
-         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"):
+         patch("core.engine.ChatEngine._build_prompt", return_value="test prompt"), \
+         patch("os.path.exists", return_value=False): # Bypass physical log check in tests
         
         engine.client.models.generate_content = MagicMock()
         mock_response = MagicMock()

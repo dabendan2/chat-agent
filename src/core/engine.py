@@ -185,13 +185,46 @@ class ChatEngine:
             return resp.json()["choices"][0]["message"]["content"]
 
     def _check_spamming(self, msgs: List[Dict[str, Any]]) -> None:
-        count = 0
+        # 1. 物理檢查 (UI)：如果 UI 顯示最新一則不是 Hermes，代表社交已互動，立即重置計數並通過
+        if msgs and msgs[-1].get("sender") != "Hermes":
+            return
+            
+        # 2. UI 計數：統計 UI 歷史中連續的 Hermes 訊息 (不含系統通知)
+        ui_count = 0
         for m in reversed(msgs):
-            if m.get("sender") != "Hermes": break
+            if m.get("sender") != "Hermes":
+                break
             text = m.get("text", "").strip()
-            if not (text.startswith("[系統") or text.startswith("[TOOL")): count += 1
+            if not (text.startswith("[系統") or text.startswith("[TOOL")):
+                ui_count += 1
+
+        # 3. 深度檢查 (Log)：防止 UI 渲染延遲與多進程競爭。
+        log_count = 0
+        log_path = self.history.log_path
         
-        if count >= self.state["spam_limit"]:
+        # 統計當前實例已發送的訊息
+        instance_count = sum(1 for m in self.state["sent_messages"] if not ("[系統" in m or "[TOOL" in m))
+        
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    log_lines = f.readlines()
+                
+                # 從最後一行往回找，計算連續的 SENT 紀錄
+                for line in reversed(log_lines):
+                    if " SENT: " in line or " SENT IMAGE: " in line:
+                        log_count += 1
+                    elif " ANALYSIS: target='Chat'" in line or " RECEIVED: " in line:
+                        break
+            except Exception as e:
+                self.history.write_log(f"Spam check warning: {e}")
+        else:
+            log_count = instance_count
+
+        # 最終計數取三者之大，確保安全性
+        final_count = max(ui_count, log_count, instance_count)
+
+        if final_count >= self.state["spam_limit"]:
             error_msg = f"[OWNER_INPUT_NEEDED] SECURITY_PROTOCOL_ACTIVATED: Spam limit reached ({self.state['spam_limit']}). Your current task loop MUST TERMINATE IMMEDIATELY. Do NOT attempt to use alternative tools (like execute_code) or modify message headers to bypass this safety limit. Report the status to the Owner and WAIT."
             self.history.write_log(f"ERROR: {error_msg}")
             raise Exception(error_msg)

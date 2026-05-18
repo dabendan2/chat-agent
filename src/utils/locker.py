@@ -12,26 +12,34 @@ class PIDLock:
         self.chat_name = chat_name
 
     def acquire(self):
-        """Checks for existing lock and acquires if possible. Returns True if acquired."""
+        """Checks for existing lock, terminates previous instance if found, and acquires lock."""
         if os.path.exists(self.lock_path):
-            with open(self.lock_path, "r") as f:
-                try:
+            try:
+                with open(self.lock_path, "r") as f:
                     old_pid = int(f.read().strip())
-                    if psutil.pid_exists(old_pid):
-                        # Verify it's actually a similar process (optional but safer)
-                        proc = psutil.Process(old_pid)
-                        # We also check if it's the SAME PID to prevent self-locking during tests
-                        is_python = "python" in proc.name().lower() or "pytest" in proc.name().lower()
-                        if is_python:
-                            print(f"[LOCK] Another instance (PID {old_pid}) is already monitoring '{self.chat_name}'. Exiting.")
-                            return False
-                except (ValueError, psutil.NoSuchProcess):
-                    pass # Stale lock or invalid PID
+                
+                if psutil.pid_exists(old_pid) and old_pid != os.getpid():
+                    proc = psutil.Process(old_pid)
+                    # Verify it's related to our agent before killing
+                    cmd_str = " ".join(proc.cmdline())
+                    if "run_engine.py" in cmd_str or "chat-agent" in proc.name():
+                        print(f"[LOCK] Found existing instance (PID {old_pid}) for '{self.chat_name}'. Terminating it to take over.")
+                        import signal
+                        proc.send_signal(signal.SIGKILL)
+                        # Wait a moment for OS to clean up
+                        import time
+                        time.sleep(0.5)
+            except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied, Exception) as e:
+                print(f"[LOCK] Warning during pre-emption check: {e}")
         
-        # Acquire lock
-        with open(self.lock_path, "w") as f:
-            f.write(str(os.getpid()))
-        return True
+        # Always attempt to (re)acquire
+        try:
+            with open(self.lock_path, "w") as f:
+                f.write(str(os.getpid()))
+            return True
+        except Exception as e:
+            print(f"[LOCK] Failed to write lock file: {e}")
+            return False
 
     def release(self):
         """Removes the lock file."""
